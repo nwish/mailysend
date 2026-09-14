@@ -121,7 +121,7 @@ const NotAvailable = ({ children }: { children: string }) => (
 
 /** The dark "remote response" block: the receiver's own last word, verbatim. */
 const RemoteResponse = ({ code, response }: { code: string | null; response: string | null }) => (
-  <div className="rounded-tile bg-ink p-4">
+  <div className="rounded-tile bg-dark p-4">
     <p className="ms-eyebrow m-0 text-on-dark-5">remote response</p>
     <p className="m-0 mt-2.5 font-mono text-[12.5px] leading-relaxed text-on-dark break-all">
       <span className="text-code-green">{code ?? '—'}</span>
@@ -134,7 +134,7 @@ const RawMessage = ({ raw }: { raw: string }) => {
   const { copied, copy } = useCopy()
 
   return (
-    <div className="relative overflow-hidden rounded-tile bg-ink">
+    <div className="relative overflow-hidden rounded-tile bg-dark">
       <div className="flex items-center gap-3 border-b border-dark-line px-4 py-2.5">
         <span className="ms-eyebrow text-on-dark-5">raw mime</span>
         <Button

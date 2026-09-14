@@ -40,10 +40,10 @@ const WorkspaceSwitcher = () => {
         <Button
           variant="ghost"
           size="sm"
-          className="gap-2 font-mono text-[12.5px] font-normal text-muted"
+          className="gap-2.5 font-mono text-[12.5px] font-normal text-muted hover:bg-card"
           aria-label={`Workspace: ${active?.name ?? 'none'}`}
         >
-          <span className="grid size-[22px] place-items-center rounded-[7px] bg-accent font-mono text-[11px] font-bold text-white">
+          <span className="grid size-7 place-items-center rounded-[9px] bg-accent font-mono text-[12px] font-bold text-white shadow-accent">
             {(active?.name ?? 'M').slice(0, 1).toUpperCase()}
           </span>
           <span className="max-w-40 truncate">{active?.slug ?? 'no workspace'}</span>
@@ -158,7 +158,7 @@ export const AppTopbar = () => {
   const [navOpen, setNavOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2.5 border-b border-line bg-tint px-4 py-2.5">
+    <header className="sticky top-0 z-30 flex min-h-16 flex-wrap items-center gap-2.5 border-b border-line bg-paper/90 px-4 py-2.5 backdrop-blur-xl">
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
         <SheetTrigger asChild>
           <Button variant="ghost" size="sm" className="lg:hidden" aria-label="Open navigation">
@@ -177,7 +177,7 @@ export const AppTopbar = () => {
         variant="ghost"
         size="sm"
         onClick={() => setOpen(true)}
-        className="ml-auto gap-2 border border-line bg-card font-normal text-muted-2 hover:bg-card hover:text-ink"
+        className="ml-auto gap-2 border border-line-soft bg-card/80 font-normal text-muted-2 shadow-sm hover:border-line hover:bg-card hover:text-ink"
       >
         <Search aria-hidden="true" />
         <span className="hidden sm:inline">Search or jump to…</span>

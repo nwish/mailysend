@@ -14,3 +14,73 @@
    is a workspace dependency compiled from source, so its class names are only
    discovered if it is named explicitly. */
 @source '../../../packages/ui/src';
+
+/*
+ * The application is deliberately cooler and quieter than the public site.
+ * MailySend's marketing pages keep their editorial paper palette; the dashboard
+ * gets a dense, neutral control-room surface without creating a second set of
+ * Tailwind utilities. All component colour utilities resolve through these
+ * variables, so cards, tables, inputs and overlays move together.
+ */
+.ms-dashboard {
+  color-scheme: dark;
+
+  --color-paper: #0a0a0c;
+  --color-card: #151518;
+  --color-tint: #101013;
+  --color-line: #29292f;
+  --color-line-soft: #202026;
+
+  --color-ink: #f4f4f5;
+  --color-muted: #b0b0b8;
+  --color-muted-2: #85858f;
+  --color-muted-3: #3a3a43;
+
+  /* The orange stays a product signature, but is used as a signal rather
+     than as a background wash. */
+  --color-accent: #ff6538;
+  --color-accent-hover: #ff7a52;
+  --color-accent-on-dark: #ff9b7d;
+  --color-accent-soft: #2b1915;
+  --color-accent-border: #6b3528;
+
+  --color-positive: #57d39b;
+  --color-positive-bright: #80e6b8;
+  --color-positive-bg: #10271e;
+  --color-warning: #ff7766;
+
+  --color-dark: #18181d;
+  --color-dark-2: #202026;
+  --color-dark-line: #34343d;
+  --color-dark-line-soft: #292931;
+
+  --color-on-dark: #f5f5f6;
+  --color-on-dark-2: #c7c7cf;
+  --color-on-dark-3: #9898a3;
+  --color-on-dark-4: #70707b;
+  --color-on-dark-5: #53535d;
+  --color-code-green: #75e0aa;
+  --color-neutral-bar: #4a4a54;
+
+  /* Instrument Sans is already shipped locally. Using it for display and body
+     gives the product a less editorial, more precise interface voice. */
+  --font-display: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-body: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.38), 0 12px 30px -22px rgb(0 0 0 / 0.7);
+  --shadow-md: 0 16px 38px -24px rgb(0 0 0 / 0.88);
+  --shadow-lg: 0 28px 70px -34px rgb(0 0 0 / 0.96);
+  --shadow-accent: 0 8px 24px -12px rgb(255 101 56 / 0.58);
+}
+
+.ms-dashboard main {
+  background:
+    radial-gradient(800px 420px at 72% -12%, rgb(255 101 56 / 0.07), transparent 64%),
+    radial-gradient(620px 360px at 12% 0%, rgb(255 255 255 / 0.035), transparent 72%),
+    var(--color-paper);
+}
+
+.ms-dashboard ::selection {
+  background: var(--color-accent);
+  color: #09090b;
+}

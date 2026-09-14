@@ -56,13 +56,18 @@ function AppLayout() {
               >
                 Skip to content
               </a>
-              <div className={cn('flex bg-paper', fullBleed ? 'h-screen' : 'min-h-screen')}>
-                <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-tint lg:flex">
-                  <div className="flex h-[57px] shrink-0 items-center gap-2.5 border-b border-line px-5">
-                    <span className="grid size-[22px] place-items-center rounded-[7px] bg-accent font-mono text-[11px] font-bold text-white">
+              <div
+                className={cn(
+                  'ms-dashboard flex bg-paper text-ink',
+                  fullBleed ? 'h-screen' : 'min-h-screen',
+                )}
+              >
+                <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line bg-tint lg:flex">
+                  <div className="flex h-[64px] shrink-0 items-center gap-3 border-b border-line px-5">
+                    <span className="grid size-7 place-items-center rounded-[9px] bg-accent font-mono text-[12px] font-bold text-white shadow-accent">
                       M
                     </span>
-                    <span className="font-display text-[15px] font-medium -tracking-[0.02em]">
+                    <span className="font-display text-[16px] font-semibold -tracking-[0.035em]">
                       MailySend
                     </span>
                   </div>

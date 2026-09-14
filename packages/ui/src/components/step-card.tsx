@@ -44,8 +44,8 @@ export const StepCard = ({
       className={cn(
         'rounded-tile border p-5',
         variant === 'tile' && 'border-line bg-card text-ink',
-        variant === 'tile-dark' && 'border-dark-line bg-dark text-paper',
-        variant === 'tile-highlight' && 'border-accent bg-dark-2 text-paper',
+        variant === 'tile-dark' && 'border-dark-line bg-dark text-on-dark',
+        variant === 'tile-highlight' && 'border-accent bg-dark-2 text-on-dark',
         className,
       )}
     >
