@@ -17,7 +17,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
         'rounded-card border',
         tone === 'paper' && 'border-line bg-card text-ink',
         tone === 'tint' && 'border-line bg-tint text-ink',
-        tone === 'dark' && 'border-ink bg-ink text-paper',
+        tone === 'dark' && 'border-dark-line bg-dark text-on-dark',
         interactive &&
           'transition-[transform,box-shadow] duration-200 hover:-translate-y-[3px] hover:shadow-lg',
         className,
