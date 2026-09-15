@@ -16,7 +16,6 @@ import {
   Settings,
   ShieldBan,
   SlidersHorizontal,
-  Target,
   Users,
   Workflow,
 } from 'lucide-react'
@@ -136,13 +135,6 @@ export const NAV: NavGroup[] = [
         icon: Globe,
         chord: 'd',
         keywords: 'dns spf dkim dmarc verify quota',
-      },
-      {
-        to: '/app/placement',
-        label: 'Placement tests',
-        icon: Target,
-        chord: 'p',
-        keywords: 'seed list inbox spam',
       },
       {
         to: '/app/mail',

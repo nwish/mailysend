@@ -1,7 +1,6 @@
 import type { DateRange } from '@mailysend/ui'
 import {
   BarRow,
-  Button,
   DateRangePicker,
   Select,
   SelectContent,
@@ -13,11 +12,11 @@ import {
   ToggleGroupItem,
 } from '@mailysend/ui'
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { BarChart3, Target } from 'lucide-react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { BarChart3 } from 'lucide-react'
 import { BreakdownChart, EngagementSplitChart, TimeseriesChart } from '~/components/app/charts.tsx'
 import { clockTime, num, ratio, shortDate } from '~/components/app/format.ts'
-import { PlacementCard, PrivacyAdjustedOpenRate } from '~/components/app/honesty.tsx'
+import { PrivacyAdjustedOpenRate } from '~/components/app/honesty.tsx'
 import { PageHeader, PageSection } from '~/components/app/page.tsx'
 import { useApi, useEnvironment } from '~/components/app/scope.tsx'
 import { CardsSkeleton, EmptyState, ErrorState } from '~/components/app/states.tsx'
@@ -122,11 +121,6 @@ function Analytics() {
     queryFn: () => api.analytics(params),
   })
 
-  const placement = useQuery({
-    queryKey: qk.placement(environment, { domain_id: search.domain_id }),
-    queryFn: () => api.placement({ domain_id: search.domain_id }),
-  })
-
   const domains = useQuery({
     queryKey: qk.domains(environment),
     queryFn: () => api.listDomains({ limit: 100 }),
@@ -159,23 +153,12 @@ function Analytics() {
     ]),
   )
 
-  const placementFigures = placement.data?.figures ?? overview.data?.placement
-  const placementFailed = placement.error && !overview.data?.placement
-
   return (
     <>
       <PageHeader
         eyebrow="Analytics"
         title="Not just sent. Landed."
         description="Every figure below is for this workspace and this environment, over the range and audience you pick here. The URL carries all of it, so this view is shareable as-is."
-        actions={
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/app/placement">
-              <Target aria-hidden="true" />
-              Placement tests
-            </Link>
-          </Button>
-        }
         toolbar={
           <div className="flex flex-wrap items-center gap-2.5">
             <DateRangePicker
@@ -406,48 +389,6 @@ function Analytics() {
               for exactly that reason.
             </p>
           </>
-        )}
-      </PageSection>
-
-      <PageSection
-        title="Inbox placement"
-        description="Per receiving provider, with the provenance of each number attached to it."
-        action={
-          <Button asChild variant="link" size="sm">
-            <Link to="/app/placement">Run a seed test →</Link>
-          </Button>
-        }
-      >
-        <p className="m-0 max-w-[80ch] text-[14px] leading-relaxed text-muted">
-          An SMTP <code className="font-mono text-[13px]">250</code> means the receiving MTA
-          accepted the bytes, not that anyone will see them. So every figure below names where it
-          came from, and anything inferred from delivery events alone is labelled an estimate rather
-          than dressed up as a measurement. A seed-list test is the only genuinely measured figure.
-        </p>
-        {placement.isLoading && overview.isLoading ? (
-          <CardsSkeleton count={4} />
-        ) : placementFailed ? (
-          <ErrorState
-            error={placement.error}
-            subject="inbox placement"
-            onRetry={() => void placement.refetch()}
-          />
-        ) : !placementFigures || placementFigures.length === 0 ? (
-          <EmptyState
-            icon={Target}
-            title="No placement figures yet"
-            description="Placement is measured, not derived. Deliver to a seed list and we can read where each message landed."
-            action={{ label: 'Run your first placement test', href: '/app/placement' }}
-          />
-        ) : (
-          <div
-            className="grid gap-3"
-            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}
-          >
-            {placementFigures.map((figure) => (
-              <PlacementCard key={`${figure.provider}-${figure.source}`} figure={figure} />
-            ))}
-          </div>
         )}
       </PageSection>
     </>
