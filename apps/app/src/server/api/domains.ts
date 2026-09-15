@@ -185,7 +185,8 @@ domains.patch('/:id', async (c) => {
   const columns: Record<string, unknown> = {}
   if (patch.open_tracking !== undefined) columns.open_tracking = patch.open_tracking ? 1 : 0
   if (patch.click_tracking !== undefined) columns.click_tracking = patch.click_tracking ? 1 : 0
-  if (patch.unsubscribe_headers !== undefined) columns.unsubscribe_headers = patch.unsubscribe_headers ? 1 : 0
+  if (patch.unsubscribe_headers !== undefined)
+    columns.unsubscribe_headers = patch.unsubscribe_headers ? 1 : 0
   if (patch.tls !== undefined) columns.tls = patch.tls
   if (patch.custom_return_path !== undefined) columns.custom_return_path = patch.custom_return_path
   if (patch.provider !== undefined) columns.provider = patch.provider ?? null
@@ -423,25 +424,32 @@ function readiness(
 }
 
 /**
- * The most recent send this domain could not complete.
+ * The latest completed send outcome, when it was a permanent failure.
  *
- * A permanent failure is otherwise invisible until somebody reads a log — which
- * includes the new "bound to a transport you have not configured" error, whose
- * whole point is that a person has to go and fix a setting. The domain page is
- * where that setting lives, so the failure belongs on it.
+ * A permanent failure is otherwise invisible until somebody reads a log, which
+ * includes the "bound to a transport you have not configured" error. A later
+ * accepted send proves that particular configuration problem is no longer
+ * current, so it must clear the warning rather than leaving the newest failure
+ * from weeks ago on the domain page.
  */
 async function lastSendError(ctx: Ctx, domainId: string) {
   const row = await ctx.sql
     .prepare(
-      `SELECT id, provider, error_message, created_at
+      `SELECT id, provider, error_message, created_at, status
          FROM messages
         WHERE workspace_id = ? AND domain_id = ? AND environment = ?
-          AND status = 'failed' AND error_message IS NOT NULL
-        ORDER BY id DESC LIMIT 1`,
+          AND status IN ('sent', 'delivery_delayed', 'delivered', 'opened', 'clicked', 'complained', 'bounced', 'failed')
+        ORDER BY created_at DESC, id DESC LIMIT 1`,
     )
     .bind(ctx.workspace.id, domainId, ctx.actor.environment)
-    .first<{ id: string; provider: string | null; error_message: string; created_at: string }>()
-  return row
+    .first<{
+      id: string
+      provider: string | null
+      error_message: string | null
+      created_at: string
+      status: string
+    }>()
+  return row?.status === 'failed' && row.error_message
     ? {
         email_id: row.id,
         provider: row.provider,
