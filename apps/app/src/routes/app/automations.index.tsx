@@ -48,6 +48,15 @@ function Automations() {
     queryFn: () => api.listAutomations({ limit: 100 }),
   })
 
+  // A contact-created automation is scoped to one audience. Fetch this beside
+  // the list so a first-run workspace never submits the empty placeholder id
+  // that the trigger editor uses while somebody is still typing.
+  const audiences = useQuery({
+    queryKey: qk.audiences(environment),
+    queryFn: () => api.listAudiences({ limit: 100 }),
+  })
+  const defaultAudience = audiences.data?.data[0]
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: qk.automations(environment) })
 
   /**
@@ -81,12 +90,11 @@ function Automations() {
   })
 
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (audienceId: string) =>
       api.createAutomation({
         name: 'Untitled automation',
-        status: 'draft',
         mode: 'cohort',
-        trigger: { type: 'contact_created', audience_id: '' },
+        trigger: { type: 'contact_created', audience_id: audienceId },
         steps: [{ type: 'wait', duration: '1 day' }],
       }),
     onSuccess: async (created) => {
@@ -95,6 +103,10 @@ function Automations() {
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
+
+  const createDefault = () => {
+    if (defaultAudience) create.mutate(defaultAudience.id)
+  }
 
   const duplicate = useMutation({
     mutationFn: (automation: AutomationRecord) =>
@@ -231,10 +243,24 @@ function Automations() {
         title="Mail that sends itself"
         description="A trigger, then steps. Each automation runs on Cloudflare Workflows; the execution mode decides whether a run covers one contact or a whole hourly cohort."
         actions={
-          <Button size="sm" disabled={create.isPending} onClick={() => create.mutate()}>
-            <Workflow aria-hidden="true" />
-            {create.isPending ? 'Creating…' : 'New automation'}
-          </Button>
+          audiences.isLoading ? (
+            <Button size="sm" disabled>
+              Loading audiences…
+            </Button>
+          ) : audiences.error ? (
+            <Button size="sm" onClick={() => void audiences.refetch()}>
+              Retry audiences
+            </Button>
+          ) : defaultAudience ? (
+            <Button size="sm" disabled={create.isPending} onClick={createDefault}>
+              <Workflow aria-hidden="true" />
+              {create.isPending ? 'Creating…' : 'New automation'}
+            </Button>
+          ) : (
+            <Button asChild size="sm">
+              <Link to="/app/audiences">Create an audience first</Link>
+            </Button>
+          )
         }
       />
 
@@ -248,8 +274,20 @@ function Automations() {
           <EmptyState
             icon={Workflow}
             title="No automations yet"
-            description="A welcome sequence is the usual first one: trigger on contact created, wait a day, send."
-            action={{ label: 'New automation', onClick: () => create.mutate() }}
+            description={
+              audiences.error
+                ? 'We could not load your audiences. Retry that request before creating an automation.'
+                : defaultAudience
+                  ? 'A welcome sequence is the usual first one: trigger on contact created, wait a day, send.'
+                  : 'A contact-created automation needs an audience. Create one first, then add your sequence.'
+            }
+            action={
+              audiences.error
+                ? { label: 'Retry audiences', onClick: () => void audiences.refetch() }
+                : defaultAudience
+                  ? { label: 'New automation', onClick: createDefault }
+                  : { label: 'Create an audience', href: '/app/audiences' }
+            }
             secondaryAction={{ label: 'Read about the two modes', href: '/docs#automation-modes' }}
           />
         }
