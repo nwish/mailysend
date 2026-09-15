@@ -936,6 +936,17 @@ analytics.get('/placement-tests', async (c) => {
 analytics.post('/placement-tests', async (c) => {
   const ctx = c.get('ctx')
   requireRole(ctx.actor, 'marketer')
+
+  // This runtime has no managed seed panel or collector that can classify a
+  // recipient's Inbox versus Spam folder. Refuse direct API calls too: without
+  // this guard, supplying addresses would create a test whose queue job has no
+  // consumer and which could never yield a measurement.
+  if (!ctx.features.seedTesting) {
+    throw apiError('not_implemented', {
+      message: 'Seed-list placement testing is not available in this deployment.',
+    })
+  }
+
   const body = z
     .object({
       name: z.string().max(200).optional(),
@@ -945,14 +956,6 @@ analytics.post('/placement-tests', async (c) => {
     .parse(await c.req.json().catch(() => ({})))
 
   const seeds = body.seed_addresses ?? []
-  if (seeds.length === 0 && !ctx.features.seedTesting) {
-    throw apiError('not_implemented', {
-      message:
-        'This deployment has no seed panel. Supply `seed_addresses` (mailboxes you control at the ' +
-        'providers you care about) to run a test against your own seeds.',
-      param: 'seed_addresses',
-    })
-  }
 
   const id = newId('placementTest')
   const now = new Date().toISOString()
