@@ -201,6 +201,9 @@ export const messages = sqliteTable(
     errorMessage: text('error_message'),
 
     sizeBytes: integer('size_bytes'),
+    /** R2 pointers to the rendered content and canonical MIME artifact. */
+    bodyKey: text('body_key'),
+    rawKey: text('raw_key'),
     /** Set once the consumer claims the message; the conditional lease against redelivery. */
     leaseUntil: integer('lease_until'),
     attempts: integer('attempts').notNull().default(0),

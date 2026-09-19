@@ -225,6 +225,14 @@ async function attempt(job: SendJob, env: Env, sql: Sql): Promise<void> {
     throw new SendError('permanent', 'cloudflare', 'send envelope is missing from the spool')
 
   const outbound = await buildOutbound(envelope, env, sql)
+  // The `messages` row is deliberately metadata-only; final bodies live in
+  // R2. Do this after templates, tracking and unsubscribe handling so the
+  // detail page shows what MailySend actually rendered, not the caller's
+  // pre-rendered input. Archiving must never turn a deliverable message into a
+  // failed one, though: logs are valuable, delivery is the product.
+  await archiveOutbound(sql, env, envelope, outbound).catch((err) => {
+    console.warn(`[send] could not archive ${envelope.email_id}`, err)
+  })
 
   // --- governor ------------------------------------------------------------
   // The daily quota on Cloudflare's transport is unpublished and ramps with
@@ -492,6 +500,61 @@ async function buildOutbound(
         }
       : {}),
   }
+}
+
+/**
+ * Stores the operator-visible representation of an outbound message.
+ *
+ * Providers do not share one wire format: SES and SMTP receive a MIME string,
+ * while Cloudflare and Resend receive structured fields and can add their own
+ * headers. The `.eml` is consequently MailySend's canonical MIME rendering,
+ * not a claim about bytes an HTTP provider later emitted. The separately
+ * stored body is what the message page renders directly.
+ */
+async function archiveOutbound(
+  sql: import('@mailysend/platform').Sql,
+  env: Env,
+  envelope: Envelope,
+  outbound: OutboundMessage,
+): Promise<void> {
+  const setting = await sql
+    .prepare(
+      "SELECT value FROM settings WHERE workspace_id = ? AND key = 'raw_message_retention_days'",
+    )
+    .bind(envelope.workspace_id)
+    .first<{ value: string | null }>()
+  const retentionDays = Number(setting?.value ?? 7)
+  // Zero is the explicit opt-out in Settings. An invalid stored value falls
+  // back to the documented default rather than silently retaining forever.
+  if (Number.isFinite(retentionDays) && retentionDays <= 0) return
+
+  const bodyKey = r2Key.outboundBody(envelope.workspace_id, envelope.email_id)
+  const rawKey = r2Key.rawOutbound(envelope.workspace_id, envelope.email_id)
+  const raw = buildMime(outbound)
+
+  await Promise.all([
+    env.BUCKET.put(
+      bodyKey,
+      JSON.stringify({ html: outbound.html ?? null, text: outbound.text ?? null }),
+      { httpMetadata: { contentType: 'application/json' } },
+    ),
+    env.BUCKET.put(rawKey, raw, { httpMetadata: { contentType: 'message/rfc822' } }),
+  ])
+
+  await sql.batch([
+    sql
+      .prepare('UPDATE messages SET body_key = ?, raw_key = ? WHERE id = ? AND workspace_id = ?')
+      .bind(bodyKey, rawKey, envelope.email_id, envelope.workspace_id),
+    // Most single sends also live in the sent-mail conversation. Broadcast and
+    // automation messages intentionally do not, but their `messages` row above
+    // remains the source of truth for their detail page and retention sweep.
+    sql
+      .prepare(
+        `UPDATE mail_messages SET body_key = ?, raw_key = ?
+          WHERE workspace_id = ? AND source_id = ? AND direction = 'out'`,
+      )
+      .bind(bodyKey, rawKey, envelope.workspace_id, envelope.email_id),
+  ])
 }
 
 function decodeAttachment(a: { content?: string | number[] }): Uint8Array {

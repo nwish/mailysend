@@ -1,4 +1,5 @@
 import { DEFAULT_WORKSPACE, monthKey, r2Key } from '@mailysend/core'
+import type { Sql } from '@mailysend/platform'
 import { tenancyFor } from './context.ts'
 import type { Env } from './env.ts'
 import { reclaimStuckSends } from './send/consumer.ts'
@@ -146,6 +147,22 @@ async function dailyMaintenance(env: Env): Promise<void> {
       .run()
   }
 
+  // Outbound bodies and canonical MIME live in R2, while their pointers live
+  // on `messages`. R2 lifecycle rules cannot follow a per-workspace setting,
+  // so the database decides exactly which objects are due and this bounded
+  // sweep deletes both representations together. Zero is the explicit
+  // "retain no message content" setting.
+  const rawRetention = await sql
+    .prepare(
+      "SELECT value FROM settings WHERE workspace_id = ? AND key = 'raw_message_retention_days'",
+    )
+    .bind(DEFAULT_WORKSPACE)
+    .first<{ value: string | null }>()
+  const configuredRawDays = Number(rawRetention?.value ?? 7)
+  const rawDays = Number.isFinite(configuredRawDays) ? Math.max(0, configuredRawDays) : 7
+  const rawCutoff = new Date(Date.now() - rawDays * 86_400_000).toISOString()
+  await sweepOutboundArchive(sql, env, rawCutoff)
+
   // Trash is a soft delete with an expiry date, which is the only kind worth
   // having: a message deleted by a misplaced `#` is recoverable for thirty days
   // and then genuinely gone, rather than living forever in a table nobody
@@ -183,4 +200,40 @@ async function dailyMaintenance(env: Env): Promise<void> {
     month: monthKey(new Date(Date.now() - 86_400_000)),
     prefix: r2Key.eventStage(DEFAULT_WORKSPACE, '', '').replace(/\/$/, ''),
   })
+}
+
+/** Delete one bounded page of expired outbound content, then clear its pointers. */
+async function sweepOutboundArchive(sql: Sql, env: Env, cutoff: string): Promise<void> {
+  const archived = await sql
+    .prepare(
+      `SELECT id, body_key, raw_key FROM messages
+        WHERE workspace_id = ? AND created_at < ?
+          AND (body_key IS NOT NULL OR raw_key IS NOT NULL)
+        ORDER BY created_at ASC, id ASC LIMIT 500`,
+    )
+    .bind(DEFAULT_WORKSPACE, cutoff)
+    .all<{ id: string; body_key: string | null; raw_key: string | null }>()
+  if (archived.results.length === 0) return
+
+  const keys = archived.results
+    .flatMap((row) => [row.body_key, row.raw_key])
+    .filter((key): key is string => key !== null)
+  await env.BUCKET.delete(keys)
+
+  const ids = archived.results.map((row) => row.id)
+  const placeholders = ids.map(() => '?').join(', ')
+  await sql.batch([
+    sql
+      .prepare(
+        `UPDATE messages SET body_key = NULL, raw_key = NULL
+          WHERE workspace_id = ? AND id IN (${placeholders})`,
+      )
+      .bind(DEFAULT_WORKSPACE, ...ids),
+    sql
+      .prepare(
+        `UPDATE mail_messages SET body_key = NULL, raw_key = NULL
+          WHERE workspace_id = ? AND direction = 'out' AND source_id IN (${placeholders})`,
+      )
+      .bind(DEFAULT_WORKSPACE, ...ids),
+  ])
 }
