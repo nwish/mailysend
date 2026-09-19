@@ -32,9 +32,17 @@ const ws = (workspaceId: string) => (workspaceId === DEFAULT_WORKSPACE ? '' : `$
 export const r2Key = {
   /** The send envelope. Read once by the consumer, expired by lifecycle at 7 days. */
   spool: (workspaceId: string, emailId: string) => `spool/${ws(workspaceId)}${emailId}.json`,
+  /** The final HTML/text MailySend rendered for an outbound message. */
+  outboundBody: (workspaceId: string, emailId: string) => `body/${ws(workspaceId)}${emailId}.json`,
   /** Outbound attachments, content-addressed so the same file is stored once. */
   attachment: (workspaceId: string, sha256: string) => `att/${ws(workspaceId)}${sha256}`,
-  /** The exact bytes we handed the provider. The only real answer to "what did you send?". */
+  /**
+   * MailySend's canonical RFC 5322 rendering of an outbound message.
+   *
+   * Cloudflare and Resend accept structured payloads and can add their own
+   * headers, so this is deliberately not described as the provider's literal
+   * wire copy. It is the portable artifact we can reproduce and inspect.
+   */
   rawOutbound: (workspaceId: string, emailId: string) => `raw/${ws(workspaceId)}${emailId}.eml`,
   /** Raw inbound MIME, written by the email() handler before anything is parsed. */
   rawInbound: (workspaceId: string, inboundId: string) =>

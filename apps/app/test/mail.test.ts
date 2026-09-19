@@ -673,6 +673,7 @@ describe('test mode', () => {
     })
     expect(res.status).toBe(200)
     expect(jobs).toHaveLength(1)
+    const { id: emailId } = (await res.json()) as { id: string }
 
     // Force the message into the test environment, as the environment switch
     // would, then run the consumer over the job the accept path enqueued.
@@ -701,6 +702,36 @@ describe('test mode', () => {
     expect(full.messages[0]?.html).toContain('Apparently it does.')
     // The original MIME, kept — so "raw .eml" is a real tab and not a promise.
     expect(full.messages[0]?.has_raw).toBe(true)
+
+    // The outbound detail must be equally inspectable. Before the archive was
+    // added, `/v1/emails/:id` promised `html` and `text` but selected neither,
+    // while `/v1/logs/:id` looked for a queue spool that normal messages never
+    // had and called its JSON envelope raw MIME.
+    const sent = await testHarness.fetch(`/v1/emails/${emailId}`, {
+      cookie: testCookie,
+      headers: { 'ms-environment': 'test' },
+    })
+    const sentBody = (await sent.json()) as {
+      html: string | null
+      text: string | null
+      content_available: boolean
+    }
+    expect(sent.status).toBe(200)
+    expect(sentBody).toMatchObject({
+      html: '<p>Apparently it does.</p>',
+      text: null,
+      content_available: true,
+    })
+
+    const log = await testHarness.fetch(`/v1/logs/${emailId}`, {
+      cookie: testCookie,
+      headers: { 'ms-environment': 'test' },
+    })
+    const logBody = (await log.json()) as { raw: string | null; raw_available: boolean }
+    expect(log.status).toBe(200)
+    expect(logBody.raw_available).toBe(true)
+    expect(logBody.raw).toContain('Subject: Does this thing work?')
+    expect(logBody.raw).toContain('Apparently it does.')
   })
 })
 

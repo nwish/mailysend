@@ -36,6 +36,7 @@ interface LogRow {
   smtp_response: string | null
   error_message: string | null
   size_bytes: number | null
+  raw_key?: string | null
   attempts: number
   scheduled_at: string | null
   sent_at: string | null
@@ -243,7 +244,7 @@ logs.get('/:id', async (c) => {
   const id = c.req.param('id')
 
   const row = await ctx.sql
-    .prepare(`SELECT ${LOG_COLUMNS} FROM messages WHERE id = ? AND workspace_id = ?`)
+    .prepare(`SELECT ${LOG_COLUMNS}, raw_key FROM messages WHERE id = ? AND workspace_id = ?`)
     .bind(id, ctx.workspace.id)
     .first<LogRow>()
   if (!row) throw apiError('not_found')
@@ -321,7 +322,7 @@ logs.get('/:id', async (c) => {
     ],
     links: links.results,
     webhook_deliveries: deliveries.results,
-    ...(await spooledEnvelope(ctx, id)),
+    ...(await canonicalMime(ctx, row.raw_key ?? null)),
     event_detail: ctx.features.eventDetail,
   })
 })
@@ -344,24 +345,18 @@ interface EventRow {
 }
 
 /**
- * The spool object expires at seven days by lifecycle rule, so its absence is
- * normal for older mail and is reported as such rather than as an error.
+ * MailySend's own RFC 5322 rendering. This is not claimed to be an HTTP
+ * provider's literal wire copy: Cloudflare and Resend accept structured
+ * payloads and may add their own headers after this point.
  */
-async function spooledEnvelope(
+async function canonicalMime(
   ctx: Ctx,
-  id: string,
-): Promise<{ raw: unknown; raw_key: string; raw_available: boolean }> {
-  const key = r2Key.spool(ctx.workspace.id, id)
+  key: string | null,
+): Promise<{ raw: string | null; raw_key?: string; raw_available: boolean }> {
+  if (!key) return { raw: null, raw_available: false }
   const object = await ctx.blob.get(key).catch(() => null)
   if (!object) return { raw: null, raw_key: key, raw_available: false }
-  const body = await object.text()
-  let raw: unknown = body
-  try {
-    raw = JSON.parse(body)
-  } catch {
-    // A spool object that is not JSON is still the truth about what we sent.
-  }
-  return { raw, raw_key: key, raw_available: true }
+  return { raw: await object.text(), raw_key: key, raw_available: true }
 }
 
 export { logs }

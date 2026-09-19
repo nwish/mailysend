@@ -6,6 +6,7 @@ import {
 } from '@mailysend/contracts'
 import { doName, idLowerBound, stableBucket } from '@mailysend/core'
 import { requireScope } from '../auth.ts'
+import type { Ctx } from '../context.ts'
 import { acceptEmail } from '../send/accept.ts'
 import {
   type App,
@@ -121,7 +122,8 @@ emails.get('/:id', async (c) => {
     .prepare(
       `SELECT id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to, subject,
               status, provider, provider_message_id, open_count, click_count, bounce_class,
-              smtp_code, smtp_response, error_message, scheduled_at, sent_at, delivered_at, created_at
+              smtp_code, smtp_response, error_message, scheduled_at, sent_at, delivered_at,
+              body_key, raw_key, created_at
          FROM messages WHERE id = ? AND workspace_id = ?`,
     )
     .bind(c.req.param('id'), ctx.workspace.id)
@@ -133,7 +135,16 @@ emails.get('/:id', async (c) => {
     .bind(ctx.workspace.id, row.id)
     .all<{ name: string; value: string }>()
 
-  return json({ ...toEmail(row), tags: tags.results })
+  const body = await archivedBody(ctx, row.body_key ?? null)
+  return json({
+    ...toEmail(row),
+    // An absent body is not evidence the original mail had no HTML/text part:
+    // older sends predate the archive, and retained content may have expired.
+    html: body?.html ?? null,
+    text: body?.text ?? null,
+    content_available: body !== null,
+    tags: tags.results,
+  })
 })
 
 /** `PATCH /v1/emails/:id` — reschedule. Only meaningful while still scheduled. */
@@ -260,6 +271,8 @@ interface MessageRow {
   smtp_code?: string | null
   smtp_response?: string | null
   error_message?: string | null
+  body_key?: string | null
+  raw_key?: string | null
   scheduled_at: string | null
   sent_at: string | null
   delivered_at?: string | null
@@ -292,5 +305,25 @@ const toEmail = (row: MessageRow) => ({
   ...(row.smtp_response ? { smtp_response: row.smtp_response } : {}),
   ...(row.error_message ? { error: row.error_message } : {}),
 })
+
+/** Final rendered outbound content lives in R2, never in D1. */
+async function archivedBody(
+  ctx: Ctx,
+  key: string | null,
+): Promise<{ html: string | null; text: string | null } | null> {
+  if (!key) return null
+  const object = await ctx.blob.get(key).catch(() => null)
+  if (!object) return null
+  try {
+    const body = (await object.json()) as { html?: unknown; text?: unknown }
+    return {
+      html: typeof body.html === 'string' ? body.html : null,
+      text: typeof body.text === 'string' ? body.text : null,
+    }
+  } catch {
+    // A corrupt archive must not make a message detail request fail.
+    return null
+  }
+}
 
 export { emails, enforceRateLimit, idLowerBound, type MessageRow, toEmail }

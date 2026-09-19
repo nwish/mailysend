@@ -136,12 +136,12 @@ const RawMessage = ({ raw }: { raw: string }) => {
   return (
     <div className="relative overflow-hidden rounded-tile bg-ink">
       <div className="flex items-center gap-3 border-b border-dark-line px-4 py-2.5">
-        <span className="ms-eyebrow text-on-dark-5">raw mime</span>
+        <span className="ms-eyebrow text-on-dark-5">MailySend MIME</span>
         <Button
           variant="ghost"
           size="sm"
           className="ml-auto size-8 p-0 text-on-dark-3 hover:text-on-dark"
-          aria-label={copied ? 'Raw message copied' : 'Copy raw message'}
+          aria-label={copied ? 'MIME copied' : 'Copy MailySend MIME'}
           onClick={() => copy(raw)}
         >
           {copied ? (
@@ -312,7 +312,7 @@ export const LogDrawer = ({ emailId }: { emailId: string }) => {
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="smtp">SMTP</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
-          <TabsTrigger value="raw">Raw</TabsTrigger>
+          <TabsTrigger value="raw">MIME</TabsTrigger>
         </TabsList>
 
         <TabsContent value="timeline">
@@ -372,8 +372,8 @@ export const LogDrawer = ({ emailId }: { emailId: string }) => {
             <RawMessage raw={raw} />
           ) : (
             <NotAvailable>
-              The raw MIME is no longer stored for this message. Raw retention is set per workspace
-              and expires separately from the log itself.
+              MailySend&rsquo;s canonical MIME is no longer retained for this message. Content
+              retention is set per workspace and expires separately from the log itself.
             </NotAvailable>
           )}
           {message.provider_message_id ? (

@@ -142,6 +142,8 @@ export const Email = z.object({
   last_event: EmailStatus,
   html: z.string().nullable().optional(),
   text: z.string().nullable().optional(),
+  /** Whether the final rendered HTML/text is still retained for this send. */
+  content_available: z.boolean().optional(),
   scheduled_at: IsoDate.nullable().optional(),
   tags: z.array(Tag).optional(),
   // --- MailySend extensions ---

@@ -134,6 +134,7 @@ function EmailDetail() {
   const message = email.data
   const recipient = bareAddress(message.to[0] ?? '')
   const cancellable = CANCELLABLE.has(message.last_event)
+  const contentUnavailable = message.content_available === false
   // `messages.error_message` has been written on every failure since sending was
   // built, and returned by the API as `error`, and shown nowhere — which is why
   // a failed send read as "failed / unassigned" with no cause anywhere on the
@@ -256,7 +257,7 @@ function EmailDetail() {
 
       <PageSection
         title="Body"
-        description="The HTML is rendered in a sandboxed frame: no scripts, no forms, no network of its own."
+        description="The final rendered HTML is shown in a sandboxed frame: no scripts, no forms, no network of its own."
       >
         <Tabs defaultValue={message.html ? 'html' : 'text'}>
           <TabsList>
@@ -273,7 +274,9 @@ function EmailDetail() {
               />
             ) : (
               <p className="m-0 rounded-tile border border-line-soft bg-card px-4 py-6 text-[14px] text-muted">
-                This message was sent without an HTML part.
+                {contentUnavailable
+                  ? 'The rendered content for this message is no longer retained. New sends are archived for the raw-message retention period.'
+                  : 'This message was sent without an HTML part.'}
               </p>
             )}
           </TabsContent>
@@ -284,8 +287,9 @@ function EmailDetail() {
               </pre>
             ) : (
               <p className="m-0 rounded-tile border border-line-soft bg-card px-4 py-6 text-[14px] text-muted">
-                This message was sent without a plain-text part. Some receivers weigh that against
-                the sender.
+                {contentUnavailable
+                  ? 'The rendered content for this message is no longer retained.'
+                  : 'This message was sent without a plain-text part. Some receivers weigh that against the sender.'}
               </p>
             )}
           </TabsContent>
