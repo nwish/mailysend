@@ -6,12 +6,12 @@ name: Deploy
 # a working system rather than a Worker that fails on its first send.
 # Manual by default. A repo created by the Deploy button has the Cloudflare
 # secrets; a fork or a clone does not, and a workflow that fails on every push
-# for a missing token teaches people to ignore the red X. `deploy-on-push`
+# for a missing token teaches people to ignore the red X. Pushing to `main`
 # turns the automatic path on once the secrets are actually set.
 on:
   workflow_dispatch:
   push:
-    branches: [deploy-on-push]
+    branches: [main]
 
 concurrency:
   group: deploy-${{ github.ref }}
