@@ -1,3 +1,4 @@
+import type { Queue, Sql } from '@mailysend/platform'
 import { Actor, type BucketState, takeTokens } from './base.ts'
 
 /**
@@ -55,6 +56,22 @@ export interface PageJob {
 }
 
 export class BroadcastActor extends Actor {
+  /**
+   * `this.env` is the Durable Object's own bindings, which on Workers are the
+   * Worker script's bindings — real, static resources declared in
+   * `wrangler.jsonc`. A Durable Object cannot receive a closure handed to it
+   * at construction time, so dispatch and completion reach for these directly
+   * rather than an injected callback (see `automation-run.ts`, which does the
+   * same for the same reason).
+   */
+  get #sql(): Sql {
+    return this.env.DB as Sql
+  }
+
+  get #queue(): Queue<PageJob> {
+    return this.env.BROADCAST_QUEUE as never
+  }
+
   /**
    * Splits the id space into 32 ranges and arms the alarm.
    *
@@ -172,7 +189,18 @@ export class BroadcastActor extends Actor {
       state.status = 'complete'
       state.completedAt = Date.now()
       await this.storage.put('state', state)
-      await this.env.ON_BROADCAST_COMPLETE?.(state.broadcastId, state.workspaceId)
+      await this.#sql
+        .prepare(
+          `UPDATE broadcasts SET status = 'sent', sent_at = ?, updated_at = ?
+             WHERE id = ? AND workspace_id = ? AND status = 'sending'`,
+        )
+        .bind(
+          new Date(state.completedAt).toISOString(),
+          new Date(state.completedAt).toISOString(),
+          state.broadcastId,
+          state.workspaceId,
+        )
+        .run()
       return
     }
 
@@ -200,7 +228,7 @@ export class BroadcastActor extends Actor {
         until: range.end,
         limit: perRange,
       }))
-      await this.env.DISPATCH_PAGES?.(jobs)
+      await this.#queue.sendBatch(jobs.map((body) => ({ body })))
     }
 
     await this.storage.setAlarm(Date.now() + TICK_MS)
