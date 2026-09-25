@@ -308,7 +308,13 @@ export function sanitizeCss(css: string, options: { inline?: boolean } = {}): st
     .replace(/-moz-binding[^;]+;?/gi, '')
     .replace(/position\s*:\s*fixed/gi, 'position:static')
     .replace(/url\(\s*['"]?\s*javascript:[^)]*\)/gi, 'none')
-  if (!options.inline) out = out.replace(/<\/?\w[^>]*>/g, '')
+  if (!options.inline) {
+    let previous: string
+    do {
+      previous = out
+      out = out.replace(/<\/?\w[^>]*>/g, '')
+    } while (out !== previous)
+  }
   return out
 }
 

@@ -25,6 +25,11 @@ describe('sanitizeMailHtml', () => {
     expect(html).not.toContain('evil')
   })
 
+  it('does not revive nested script tags while sanitising malformed markup', () => {
+    const { html } = sanitizeMailHtml('<scr<script>ipt>alert(1)</scr<script>ipt>')
+    expect(html).not.toMatch(/<script\b/i)
+  })
+
   it('removes every event handler', () => {
     const { html } = sanitizeMailHtml(
       '<div onclick="steal()" onmouseover="steal()" onerror="steal()">x</div>',

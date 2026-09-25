@@ -773,5 +773,10 @@ function htmlToText(value: string): string {
   for (const block of [...doc.querySelectorAll('div,p,li,blockquote')]) {
     block.append('\n')
   }
-  return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim()
+  // Read text-node data directly. It is plain text for the textarea, never
+  // markup that can be fed back into an HTML sink.
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+  let text = ''
+  while (walker.nextNode()) text += (walker.currentNode as Text).data
+  return text.replace(/\n{3,}/g, '\n\n').trim()
 }

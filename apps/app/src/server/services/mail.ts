@@ -92,7 +92,7 @@ export const normalizeSubject = (subject: string): string =>
 export const stripTags = (html: string): string =>
   html
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<script\b[\s\S]*?<\/script\s*[^>]*>/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')

@@ -26,7 +26,7 @@ export class NodeBlob implements Blob {
 
   #path(key: string): string {
     if (key.includes('..') || key.startsWith('/') || key.includes('\0')) {
-      throw new Error(`unsafe blob key: ${key}`)
+      throw new Error('Invalid blob key')
     }
     return join(this.#root, key.split('/').join(sep))
   }
@@ -49,7 +49,14 @@ export class NodeBlob implements Blob {
     else if (value instanceof ArrayBuffer) bytes = new Uint8Array(value)
     else if (ArrayBuffer.isView(value))
       bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
-    else bytes = new Uint8Array(await new Response(value as ReadableStream).arrayBuffer())
+    else {
+      try {
+        bytes = new Uint8Array(await new Response(value as ReadableStream).arrayBuffer())
+      } catch (error) {
+        console.error('[blob] failed to read upload body', error)
+        throw new Error('Unable to read blob contents')
+      }
+    }
 
     await writeFile(file, bytes)
     const etag = createHash('md5').update(bytes).digest('hex')
