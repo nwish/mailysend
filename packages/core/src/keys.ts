@@ -91,7 +91,7 @@ export const kvKey = {
     `tplc:${workspaceId}:${templateId}:${version}`,
   /** Maps a short link token back to its destination, written at render time. */
   link: (workspaceId: string, linkId: string) => `lnk:${workspaceId}:${linkId}`,
-  /** Read by every in-flight page worker, so pause takes effect within its 5s TTL. */
+  /** Read by every in-flight page worker; written with no expiry (see `flip` in broadcasts.ts). */
   broadcastFlag: (workspaceId: string, broadcastId: string) => `bcf:${workspaceId}:${broadcastId}`,
   eventDedupe: (eventId: string) => `evd:${eventId}`,
   /** First open/click per (message, recipient) — the difference between total and unique. */
@@ -112,8 +112,6 @@ export const KV_TTL = {
   compiledTemplate: 3600,
   /** Links must outlive the campaign: people click year-old newsletters. */
   link: 400 * 86_400,
-  /** Short by design — pause must take effect quickly, and the flag is cheap to re-read. */
-  broadcastFlag: 5,
   eventDedupe: 7 * 86_400,
   uniqueMarker: 400 * 86_400,
 } as const
