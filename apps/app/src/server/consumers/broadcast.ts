@@ -106,11 +106,9 @@ async function sendPage(
   const body = await env.BUCKET.get(bodyKey)
   if (!body) throw new Error(`broadcast body ${bodyKey} is missing`)
   const rendered = (await body.json()) as {
-    from: string
     subject: string
-    html: string
-    text: string
-    reply_to?: string[]
+    html: string | null
+    text: string | null
   }
 
   let count = 0
@@ -133,12 +131,12 @@ async function sendPage(
       const accepted = await acceptEmail(
         ctx,
         {
-          from: rendered.from,
+          from: broadcast.from_address,
           to: [contact.email],
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
-          ...(rendered.reply_to ? { reply_to: rendered.reply_to } : {}),
+          ...(broadcast.reply_to ? { reply_to: JSON.parse(broadcast.reply_to) as string[] } : {}),
         } as never,
         { broadcastId: job.broadcastId, contactId: contact.id },
       )
