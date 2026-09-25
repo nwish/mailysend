@@ -3,6 +3,7 @@ import { BroadcastActor, BroadcastCounterActor } from '@mailysend/durable'
 import { NodeActorRegistry } from '@mailysend/platform/node'
 import { describe, expect, it, vi } from 'vitest'
 import { consumeBroadcastPages } from '../src/server/consumers/broadcast.ts'
+import { consumeSend } from '../src/server/send/consumer.ts'
 import { claimFor, type Harness, harness, sessionFor, verifiedDomain } from './harness.ts'
 
 /**
@@ -56,6 +57,9 @@ interface SetUp {
 async function setUp(h: Harness, extra: Record<string, unknown> = {}): Promise<SetUp> {
   const cookie = await sessionFor(h, await claimFor(h))
   await verifiedDomain(h, 'acme.dev')
+  await h.sql
+    .prepare("UPDATE domains SET click_tracking = 1, open_tracking = 1 WHERE name = 'acme.dev'")
+    .run()
 
   const audience = (await (
     await h.fetch('/v1/audiences', {
@@ -118,6 +122,19 @@ describe('broadcast sending, end to end', () => {
 
     // Bug #3: run the actual queue consumer over every dispatched page. A
     // recipient whose send throws leaves `broadcast_sends.message_id` null.
+    const emailJobs: unknown[] = []
+    h.env.SEND_QUEUE = {
+      send: async (job: unknown) => emailJobs.push(job),
+      sendBatch: async () => {},
+    }
+    const delivered: { html?: string; headers?: Record<string, string> }[] = []
+    h.env.SEND_EMAIL = {
+      send: async (message: unknown) => {
+        delivered.push(message as never)
+        return { messageId: 'cf_test' }
+      },
+    }
+
     await consumeBroadcastPages(
       { messages: queued.map((body) => ({ body, ack() {}, retry() {} })) } as never,
       h.env,
@@ -129,6 +146,20 @@ describe('broadcast sending, end to end', () => {
       .all<{ message_id: string | null }>()
     expect(sends.results.length).toBe(1)
     expect(sends.results[0]?.message_id).not.toBeNull()
+
+    // The queued email itself is delivered inline whenever there is no queue
+    // consumer attached (see `acceptEmail`'s `!ctx.env.SEND_QUEUE` branch) —
+    // not the case here since SEND_QUEUE is stubbed above, so drive the real
+    // consumer over what it queued to see exactly what a recipient receives.
+    await consumeSend(
+      { messages: emailJobs.map((body) => ({ body, ack() {}, retry() {} })) } as never,
+      h.env,
+    )
+
+    expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.html).toMatch(/unsubscribe/i)
+    expect(delivered[0]?.headers?.['List-Unsubscribe']).toMatch(/^<https?:\/\//)
+    expect(delivered[0]?.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
 
     // Every range's single page came back short of its limit, so this tick
     // sees nothing pending and runs the completion path.
