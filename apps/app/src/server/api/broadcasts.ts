@@ -4,7 +4,7 @@ import {
   CreateBroadcastRequest,
   SendBroadcastRequest,
 } from '@mailysend/contracts'
-import { doName, KV_TTL, kvKey, newId, parseScheduledAt, r2Key, stableHash } from '@mailysend/core'
+import { doName, kvKey, newId, parseScheduledAt, r2Key, stableHash } from '@mailysend/core'
 import { COUNTER_SHARDS, RANGE_COUNT } from '@mailysend/durable'
 import { z } from 'zod'
 import { requireRole, requireScope } from '../auth.ts'
@@ -445,8 +445,12 @@ const actorFor = (ctx: Ctx, broadcastId: string) =>
  * Pause, resume and cancel all write the KV flag first.
  *
  * A page worker in flight has already left the coordinator behind; the flag is
- * the only thing it re-reads, and its 5s TTL is what bounds how long a paused
- * broadcast keeps sending.
+ * the only thing it re-reads. It is written with no expiry — Cloudflare KV
+ * enforces a 60s minimum on `expirationTtl`, and a self-expiring flag would be
+ * actively unsafe here anyway: a broadcast left paused (or canceled) longer
+ * than the TTL would have in-flight page workers stop seeing the flag and
+ * resume sending on their own. `resume` is what clears it; a canceled
+ * broadcast never resumes, so its flag is meant to outlive the broadcast.
  */
 async function flip(
   ctx: Ctx,
@@ -461,7 +465,7 @@ async function flip(
   const status = action === 'pause' ? 'paused' : action === 'resume' ? 'sending' : 'canceled'
   const key = kvKey.broadcastFlag(ctx.workspace.id, row.id)
   if (action === 'resume') await ctx.cache.delete(key)
-  else await ctx.cache.put(key, status, { expirationTtl: KV_TTL.broadcastFlag })
+  else await ctx.cache.put(key, status)
 
   const stub = actorFor(ctx, row.id)
   if (action === 'pause') await stub.pause()
