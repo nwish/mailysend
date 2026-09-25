@@ -118,29 +118,98 @@ export interface TagMatch {
   end: number
 }
 
-const TAG_RE =
-  /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![a-zA-Z][^>]*>|<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)((?:'[^']*'|"[^"]*"|[^>'"])*?)(\/?)>/g
+const isAsciiLetter = (char: string | undefined): boolean =>
+  char !== undefined && ((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z'))
+
+const isTagNameChar = (char: string | undefined): boolean =>
+  char !== undefined &&
+  (isAsciiLetter(char) || (char >= '0' && char <= '9') || char === ':' || char === '-')
 
 /** Yields every element tag in document order, skipping comments and raw text. */
 export function* scanTags(html: string): Generator<TagMatch> {
   const lower = html.toLowerCase()
-  TAG_RE.lastIndex = 0
-  for (let match = TAG_RE.exec(html); match !== null; match = TAG_RE.exec(html)) {
-    const name = match[2]
-    if (name === undefined) continue
-    const tagName = name.toLowerCase()
+  let searchFrom = 0
+  let commentsCanClose = true
+  let cdataCanClose = true
+  let declarationsCanClose = true
+
+  while (searchFrom < html.length) {
+    const start = html.indexOf('<', searchFrom)
+    if (start === -1) return
+
+    // These constructs are not element tags. Using indexOf rather than a
+    // broad lazy regex is important here: an unterminated comment must not
+    // retry a scan from every subsequent `<` in a customer-controlled body.
+    if (commentsCanClose && html.startsWith('<!--', start)) {
+      const close = html.indexOf('-->', start + 4)
+      if (close !== -1) {
+        searchFrom = close + 3
+        continue
+      }
+      commentsCanClose = false
+    } else if (cdataCanClose && html.startsWith('<![CDATA[', start)) {
+      const close = html.indexOf(']]>', start + 9)
+      if (close !== -1) {
+        searchFrom = close + 3
+        continue
+      }
+      cdataCanClose = false
+    } else if (declarationsCanClose && html[start + 1] === '!' && isAsciiLetter(html[start + 2])) {
+      const close = html.indexOf('>', start + 3)
+      if (close !== -1) {
+        searchFrom = close + 1
+        continue
+      }
+      declarationsCanClose = false
+    }
+
+    let cursor = start + 1
+    const closing = html[cursor] === '/'
+    if (closing) cursor++
+    const nameStart = cursor
+    if (!isAsciiLetter(html[cursor])) {
+      searchFrom = start + 1
+      continue
+    }
+    cursor++
+    while (isTagNameChar(html[cursor])) cursor++
+    const nameEnd = cursor
+
+    let quote: "'" | '"' | null = null
+    let end = -1
+    for (; cursor < html.length; cursor++) {
+      const char = html[cursor]
+      if (quote !== null) {
+        if (char === quote) quote = null
+      } else if (char === "'" || char === '"') {
+        quote = char
+      } else if (char === '>') {
+        end = cursor
+        break
+      }
+    }
+    if (end === -1 || quote !== null) {
+      searchFrom = start + 1
+      continue
+    }
+
+    const tagName = html.slice(nameStart, nameEnd).toLowerCase()
+    const selfClosing = html[end - 1] === '/' || VOID_ELEMENTS.has(tagName)
+    const attrsEnd = html[end - 1] === '/' ? end - 1 : end
     const tag: TagMatch = {
       name: tagName,
-      closing: match[1] === '/',
-      selfClosing: match[4] === '/' || VOID_ELEMENTS.has(tagName),
-      attrs: match[3] ?? '',
-      start: match.index,
-      end: match.index + match[0].length,
+      closing,
+      selfClosing,
+      attrs: html.slice(nameEnd, attrsEnd),
+      start,
+      end: end + 1,
     }
     yield tag
+
+    searchFrom = tag.end
     if (!tag.closing && !tag.selfClosing && RAW_TEXT.has(tagName)) {
       const close = lower.indexOf(`</${tagName}`, tag.end)
-      if (close !== -1) TAG_RE.lastIndex = close
+      if (close !== -1) searchFrom = close
     }
   }
 }
