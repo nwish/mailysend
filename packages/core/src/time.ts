@@ -33,7 +33,7 @@ const UNITS: Record<string, number> = {
 
 /** `"30m"`, `"2 days"`, `"1h30m"` → milliseconds. Null when unparseable. */
 export const parseDuration = (input: string): number | null => {
-  const matches = input.toLowerCase().matchAll(/(\d+(?:\.\d+)?)\s*([a-z]+)/g)
+  const matches = input.toLowerCase().matchAll(/(?<!\d)(\d+(?:\.\d+)?)\s*([a-z]+)/g)
   let total = 0
   let found = false
   for (const m of matches) {
@@ -77,9 +77,8 @@ export const parseScheduledAt = (input: string, now = new Date()): ScheduleParse
     return { at: iso, interpretation: 'iso' }
   }
 
-  const relative = text.match(/^in\s+(.+)$/)
-  if (relative) {
-    const ms = parseDuration(relative[1]!)
+  if (text.startsWith('in') && /\s/.test(text[2] ?? '')) {
+    const ms = parseDuration(text.slice(2).trim())
     if (ms === null) return null
     return { at: new Date(now.getTime() + ms), interpretation: 'relative' }
   }

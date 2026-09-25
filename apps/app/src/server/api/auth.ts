@@ -74,7 +74,11 @@ const VerifyBody = z.object({
 
 /** Crypto-random, uniform over 000000-999999 — not `Math.random()`. */
 function newCode(): string {
-  const bytes = crypto.getRandomValues(new Uint32Array(1))
+  const bytes = new Uint32Array(1)
+  const range = Math.floor(0x1_0000_0000 / 1_000_000) * 1_000_000
+  do {
+    crypto.getRandomValues(bytes)
+  } while (bytes[0]! >= range)
   return String(bytes[0]! % 1_000_000).padStart(6, '0')
 }
 

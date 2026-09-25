@@ -673,15 +673,26 @@ const toFigure = (row: PlacementRow) => ({
   measured_at: row.measured_at,
 })
 
+/** Matches a provider's exact hostname or a subdomain beneath it. */
+const isDomainOrSubdomain = (domain: string, provider: string): boolean =>
+  domain === provider || domain.endsWith(`.${provider}`)
+
 /** Which mailbox provider an address belongs to, for grouping delivery events. */
 const providerOf = (recipient: string): string => {
   const domain = recipient.split('@')[1]?.toLowerCase() ?? ''
-  if (/(^|\.)(gmail|googlemail)\.com$/.test(domain) || domain.endsWith('google.com'))
+  if (/(^|\.)(gmail|googlemail)\.com$/.test(domain) || isDomainOrSubdomain(domain, 'google.com'))
     return 'google'
-  if (/(^|\.)(outlook|hotmail|live|msn)\./.test(`${domain}.`) || domain.endsWith('microsoft.com'))
+  if (
+    /(^|\.)(outlook|hotmail|live|msn)\./.test(`${domain}.`) ||
+    isDomainOrSubdomain(domain, 'microsoft.com')
+  )
     return 'microsoft'
   if (/(^|\.)(yahoo|aol|ymail)\./.test(`${domain}.`)) return 'yahoo'
-  if (domain.endsWith('icloud.com') || domain.endsWith('me.com') || domain.endsWith('mac.com'))
+  if (
+    isDomainOrSubdomain(domain, 'icloud.com') ||
+    isDomainOrSubdomain(domain, 'me.com') ||
+    isDomainOrSubdomain(domain, 'mac.com')
+  )
     return 'apple'
   return 'other'
 }

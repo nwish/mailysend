@@ -12,10 +12,10 @@ export interface ParsedAddress {
   domain: string
 }
 
-const ADDR_WITH_NAME = /^\s*(?:"([^"]*)"|([^<]*?))\s*<([^>]+)>\s*$/
+const ADDR_WITH_NAME = /^(?:"([^"]*)"\s*|([^<]*))<([^>]+)>\s*$/
 
 export const parseAddress = (input: string): ParsedAddress | null => {
-  const m = input.match(ADDR_WITH_NAME)
+  const m = input.trimStart().match(ADDR_WITH_NAME)
   const address = (m ? m[3]! : input).trim().toLowerCase()
   const at = address.lastIndexOf('@')
   if (at < 1 || at === address.length - 1) return null
@@ -82,14 +82,23 @@ export const normalizeForSuppression = (address: string): string => {
 }
 
 /** Recipient-provider bucket for placement analytics and per-provider throttling. */
+const isDomainOrSubdomain = (host: string, root: string): boolean =>
+  host === root || host.endsWith(`.${root}`)
+
 export const recipientProvider = (domain: string): string => {
   const d = domain.toLowerCase()
   if (/^(gmail|googlemail)\.com$/.test(d)) return 'gmail'
   if (/^(outlook|hotmail|live|msn)\./.test(d) || d === 'outlook.com') return 'microsoft'
   if (/^(yahoo|ymail|rocketmail)\./.test(d) || d.startsWith('yahoo.')) return 'yahoo'
-  if (d.endsWith('icloud.com') || d.endsWith('me.com') || d.endsWith('mac.com')) return 'apple'
-  if (d.endsWith('protonmail.com') || d.endsWith('proton.me')) return 'proton'
-  if (d.endsWith('aol.com')) return 'aol'
-  if (d.endsWith('zoho.com')) return 'zoho'
+  if (
+    isDomainOrSubdomain(d, 'icloud.com') ||
+    isDomainOrSubdomain(d, 'me.com') ||
+    isDomainOrSubdomain(d, 'mac.com')
+  )
+    return 'apple'
+  if (isDomainOrSubdomain(d, 'protonmail.com') || isDomainOrSubdomain(d, 'proton.me'))
+    return 'proton'
+  if (isDomainOrSubdomain(d, 'aol.com')) return 'aol'
+  if (isDomainOrSubdomain(d, 'zoho.com')) return 'zoho'
   return 'other'
 }

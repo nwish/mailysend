@@ -298,7 +298,9 @@ describe('what a new domain starts with', () => {
     // The response is a literal; this is the row, which is what the send path
     // reads. The two disagreeing is exactly the bug this guards.
     const row = await h.sql
-      .prepare('SELECT open_tracking, click_tracking, unsubscribe_headers FROM domains WHERE id = ?')
+      .prepare(
+        'SELECT open_tracking, click_tracking, unsubscribe_headers FROM domains WHERE id = ?',
+      )
       .bind(body.id)
       .first<{ open_tracking: number; click_tracking: number; unsubscribe_headers: number }>()
     expect(row?.open_tracking).toBe(0)
@@ -320,7 +322,9 @@ describe('what a new domain starts with', () => {
       .bind(new Date().toISOString(), new Date().toISOString())
       .run()
     const row = await h.sql
-      .prepare('SELECT open_tracking, click_tracking, unsubscribe_headers FROM domains WHERE id = ?')
+      .prepare(
+        'SELECT open_tracking, click_tracking, unsubscribe_headers FROM domains WHERE id = ?',
+      )
       .bind('dom_default')
       .first<{ open_tracking: number; click_tracking: number; unsubscribe_headers: number }>()
     expect(row?.open_tracking).toBe(0)
@@ -453,6 +457,20 @@ describe('the MX preflight', () => {
     expect(row?.receiving_mx_status).toBe('verified')
     expect(row?.receiving_mx_found).toContain('mx.cloudflare.net')
     expect(row?.receiving_checked_at).toBe(body.checked_at)
+  })
+
+  it('does not accept a hostname that merely contains the Cloudflare MX suffix', async () => {
+    const id = await domainWith('acme.dev', [])
+    stubResolver({
+      'acme.dev/MX': {
+        Status: 0,
+        Answer: [{ name: 'acme.dev', type: TYPE.MX, data: '10 fake-mx.cloudflare.net.evil.tld.' }],
+      },
+    })
+
+    const body = await check(id)
+    expect(body.status).toBe('failed')
+    expect(await remembered(id)).toMatchObject({ receiving_mx_status: 'failed' })
   })
 
   it('says so when the mail goes somewhere else', async () => {

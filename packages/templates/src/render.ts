@@ -95,6 +95,26 @@ const collect = (
   return result.output
 }
 
+const hasHandlebarsPlaceholder = (source: string): boolean => {
+  let cursor = 0
+  while (cursor < source.length) {
+    const start = source.indexOf('{{', cursor)
+    if (start === -1) return false
+    let close = start + 2
+    while (close < source.length && source[close] !== '}') close++
+    if (close === source.length) return false
+    if (source[close + 1] === '}') {
+      if (close > start + 2) return true
+      cursor = close + 1
+    } else {
+      // A single `}` makes this candidate invalid, and no candidate before
+      // it can be valid either. Continue after it to keep this linear.
+      cursor = close + 1
+    }
+  }
+  return false
+}
+
 const renderBody = async (
   input: RenderTemplateInput,
   data: Record<string, unknown>,
@@ -126,7 +146,7 @@ const renderBody = async (
       // worth reporting rather than silently interpreting, because interpreting
       // them would change what an already-approved body renders as.
       const raw = input.html ?? ''
-      if (/\{\{[^}]+\}\}/.test(raw)) {
+      if (hasHandlebarsPlaceholder(raw)) {
         warnings.push(
           warn(
             'raw_html_placeholders',
@@ -179,26 +199,104 @@ const BLOCK_TAGS = new Set([
   'ul',
 ])
 
-const DROPPED_CONTENT = /<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
-const COMMENTS = /<!--[\s\S]*?-->/g
+const DROPPED_TAGS = ['script', 'style', 'head', 'title', 'noscript'] as const
+
+const isAsciiWord = (char: string | undefined): boolean =>
+  char !== undefined &&
+  ((char >= 'a' && char <= 'z') ||
+    (char >= 'A' && char <= 'Z') ||
+    (char >= '0' && char <= '9') ||
+    char === '_')
+
+const isHtmlWhitespace = (char: string | undefined): boolean =>
+  char === ' ' || char === '\t' || char === '\n' || char === '\r' || char === '\f'
+
+const stripHtmlComments = (html: string): string => {
+  let output = ''
+  let cursor = 0
+  while (cursor < html.length) {
+    const start = html.indexOf('<!--', cursor)
+    if (start === -1) return output + html.slice(cursor)
+    const close = html.indexOf('-->', start + 4)
+    if (close === -1) return output + html.slice(cursor)
+    output += html.slice(cursor, start)
+    cursor = close + 3
+  }
+  return output
+}
+
+const findDroppedClose = (source: string, lower: string, name: string, from: number): number => {
+  const marker = `</${name}`
+  let start = lower.indexOf(marker, from)
+  while (start !== -1) {
+    let cursor = start + marker.length
+    while (isHtmlWhitespace(source[cursor])) cursor++
+    if (source[cursor] === '>') return cursor + 1
+    start = lower.indexOf(marker, start + 2)
+  }
+  return -1
+}
+
+const stripDroppedContent = (html: string): string => {
+  const lower = html.toLowerCase()
+  let output = ''
+  let cursor = 0
+  let searchFrom = 0
+
+  while (searchFrom < html.length) {
+    const start = lower.indexOf('<', searchFrom)
+    if (start === -1) return output + html.slice(cursor)
+
+    let name: (typeof DROPPED_TAGS)[number] | undefined
+    for (const candidate of DROPPED_TAGS) {
+      if (!lower.startsWith(candidate, start + 1)) continue
+      if (isAsciiWord(lower[start + 1 + candidate.length])) continue
+      name = candidate
+      break
+    }
+    if (name === undefined) {
+      searchFrom = start + 1
+      continue
+    }
+
+    const openEnd = lower.indexOf('>', start + name.length + 1)
+    if (openEnd === -1) {
+      searchFrom = start + 1
+      continue
+    }
+    const closeEnd = findDroppedClose(html, lower, name, openEnd + 1)
+    if (closeEnd === -1) {
+      searchFrom = start + 1
+      continue
+    }
+
+    output += html.slice(cursor, start)
+    cursor = closeEnd
+    searchFrom = closeEnd
+  }
+
+  return output + html.slice(cursor)
+}
+
+/**
+ * Strip all dangerous structures, repeating until stable so a nested opener
+ * exposed by one removal cannot survive into the text parser.
+ */
+const sanitizeHtmlForText = (html: string): string => {
+  let source = html
+  while (true) {
+    const next = stripDroppedContent(stripHtmlComments(source))
+    if (next === source) return source
+    source = next
+  }
+}
+
 /** Preheaders and the MSO ghost tables are hidden on purpose; keep them hidden. */
 const HIDDEN_BLOCK =
   /<(div|span|td|table|p)\b[^>]*style\s*=\s*("[^"]*|'[^']*)display\s*:\s*none[\s\S]*?<\/\1\s*>/gi
 
-/**
- * Derives the text/plain part.
- *
- * Not optional and not cosmetic: a message with no text part scores worse at
- * every major filter, is unreadable on a watch or a plain-text client, and is
- * one of the few content signals a receiver can check cheaply. Sending
- * `strip_tags(html)` instead is barely better — a wall of collapsed navigation
- * with the link destinations thrown away reads as machine-generated, which is
- * exactly what the filter is looking for. So links keep their destination as
- * `label (url)`, block elements become paragraph breaks, and list items keep a
- * bullet.
- */
 export const htmlToText = (html: string): string => {
-  let source = html.replace(COMMENTS, '').replace(DROPPED_CONTENT, '')
+  let source = sanitizeHtmlForText(html)
   // Run twice: a hidden preheader is often nested one level inside another
   // hidden wrapper, and this regex is not recursive.
   source = source.replace(HIDDEN_BLOCK, '').replace(HIDDEN_BLOCK, '')

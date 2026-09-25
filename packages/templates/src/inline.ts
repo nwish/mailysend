@@ -112,8 +112,24 @@ interface ParsedSheet {
   retainedSelectors: string[]
 }
 
+const stripCssComments = (css: string): string => {
+  let output = ''
+  let cursor = 0
+
+  while (cursor < css.length) {
+    const start = css.indexOf('/*', cursor)
+    if (start === -1) return output + css.slice(cursor)
+    const close = css.indexOf('*/', start + 2)
+    if (close === -1) return output + css.slice(cursor)
+    output += css.slice(cursor, start)
+    cursor = close + 2
+  }
+
+  return output
+}
+
 const parseSheet = (css: string, startOrder: number): ParsedSheet => {
-  const source = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const source = stripCssComments(css)
   const rules: Rule[] = []
   const retained: string[] = []
   const retainedSelectors: string[] = []

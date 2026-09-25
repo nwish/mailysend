@@ -185,7 +185,8 @@ domains.patch('/:id', async (c) => {
   const columns: Record<string, unknown> = {}
   if (patch.open_tracking !== undefined) columns.open_tracking = patch.open_tracking ? 1 : 0
   if (patch.click_tracking !== undefined) columns.click_tracking = patch.click_tracking ? 1 : 0
-  if (patch.unsubscribe_headers !== undefined) columns.unsubscribe_headers = patch.unsubscribe_headers ? 1 : 0
+  if (patch.unsubscribe_headers !== undefined)
+    columns.unsubscribe_headers = patch.unsubscribe_headers ? 1 : 0
   if (patch.tls !== undefined) columns.tls = patch.tls
   if (patch.custom_return_path !== undefined) columns.custom_return_path = patch.custom_return_path
   if (patch.provider !== undefined) columns.provider = patch.provider ?? null
@@ -574,7 +575,9 @@ domains.post('/:id/receiving-check', async (c) => {
 
   const exchanges = answers.map((a) => canonical(a.data.trim().split(/\s+/).pop() ?? a.data))
   const found = answers.map((a) => a.data.trim()).join(' | ') || null
-  const cloudflare = exchanges.filter((e) => e.endsWith('mx.cloudflare.net'))
+  const cloudflare = exchanges.filter(
+    (exchange) => exchange === 'mx.cloudflare.net' || exchange.endsWith('.mx.cloudflare.net'),
+  )
 
   const status =
     exchanges.length === 0 ? 'pending' : cloudflare.length > 0 ? 'verified' : ('failed' as const)

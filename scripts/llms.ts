@@ -86,7 +86,11 @@ function textOf(path: string): string {
   // gains stray spaces (`'mailysend' ;`). What is left — links, buttons — sits
   // beside a sibling and needs one, or the text runs together
   // ("Deploy in one click→Swap Resend in one line").
-  s = s.replace(/<\/?(?:span|em|strong|b|i|code|abbr|sup|sub|time|mark)\b[^>]*>/gi, '')
+  let previous: string
+  do {
+    previous = s
+    s = s.replace(/<\/?(?:span|em|strong|b|i|code|abbr|sup|sub|time|mark)\b[^>]*>/gi, '')
+  } while (s !== previous)
   s = s.replace(/<[^>]+>/g, ' ')
   s = decodeEntities(s)
   s = s.replace(/[ \t ]+/g, ' ')

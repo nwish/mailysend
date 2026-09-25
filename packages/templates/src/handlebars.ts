@@ -494,6 +494,39 @@ export interface HandlebarsInput {
   escape?: boolean
 }
 
+/**
+ * Removes mustache expressions after a parse failure without repeatedly
+ * rescanning the suffix for each `{{`. The old regex did exactly that for an
+ * unterminated run such as `{{{{{{`, making malformed customer templates
+ * quadratic to process.
+ */
+const stripMustacheExpressions = (source: string): string => {
+  let output = ''
+  let cursor = 0
+  let searchFrom = 0
+
+  while (searchFrom < source.length) {
+    const start = source.indexOf('{{', searchFrom)
+    if (start === -1) return output + source.slice(cursor)
+    const close = source.indexOf('}}', start + 2)
+    if (close === -1) return output + source.slice(cursor)
+
+    // Match the old [^}]* body: if a closing brace occurs before this pair,
+    // this candidate is not a match, but a later nested `{{` may still be.
+    const firstClose = source.indexOf('}', start + 2)
+    if (firstClose < close) {
+      searchFrom = firstClose + 1
+      continue
+    }
+
+    output += source.slice(cursor, start)
+    cursor = close + 2
+    searchFrom = cursor
+  }
+
+  return output + source.slice(cursor)
+}
+
 export const renderHandlebars = (source: string, input: HandlebarsInput = {}): HandlebarsOutput => {
   const data = input.data ?? {}
   const ctx: EvalContext = {
@@ -512,7 +545,7 @@ export const renderHandlebars = (source: string, input: HandlebarsInput = {}): H
     ctx.warnings.push(
       warn('unsupported_syntax', `Template did not parse: ${(error as Error).message}`),
     )
-    return { output: source.replace(/\{\{[^}]*\}\}/g, ''), warnings: ctx.warnings }
+    return { output: stripMustacheExpressions(source), warnings: ctx.warnings }
   }
 }
 
