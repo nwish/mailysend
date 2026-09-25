@@ -221,6 +221,7 @@ broadcasts.post('/:id/send', async (c) => {
   requireRole(ctx.actor, 'marketer')
   const row = await loadBroadcast(ctx, c.req.param('id'))
   if (row.status !== 'draft' && row.status !== 'scheduled') throw apiError('broadcast_already_sent')
+  if (!row.from_address) throw apiError('missing_required_field', { param: 'from' })
 
   const body = SendBroadcastRequest.parse(await c.req.json().catch(() => ({})))
   const scheduled = body.scheduled_at ? parseScheduledAt(body.scheduled_at) : null
