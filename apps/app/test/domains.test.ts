@@ -426,6 +426,20 @@ describe('the MX preflight', () => {
     expect(row?.receiving_checked_at).toBe(body.checked_at)
   })
 
+  it('does not accept a hostname that merely contains the Cloudflare MX suffix', async () => {
+    const id = await domainWith('acme.dev', [])
+    stubResolver({
+      'acme.dev/MX': {
+        Status: 0,
+        Answer: [{ name: 'acme.dev', type: TYPE.MX, data: '10 fake-mx.cloudflare.net.evil.tld.' }],
+      },
+    })
+
+    const body = await check(id)
+    expect(body.status).toBe('failed')
+    expect(await remembered(id)).toMatchObject({ receiving_mx_status: 'failed' })
+  })
+
   it('says so when the mail goes somewhere else', async () => {
     const id = await domainWith('acme.dev', [])
     stubResolver({

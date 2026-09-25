@@ -572,7 +572,9 @@ domains.post('/:id/receiving-check', async (c) => {
 
   const exchanges = answers.map((a) => canonical(a.data.trim().split(/\s+/).pop() ?? a.data))
   const found = answers.map((a) => a.data.trim()).join(' | ') || null
-  const cloudflare = exchanges.filter((e) => e.endsWith('mx.cloudflare.net'))
+  const cloudflare = exchanges.filter(
+    (exchange) => exchange === 'mx.cloudflare.net' || exchange.endsWith('.mx.cloudflare.net'),
+  )
 
   const status =
     exchanges.length === 0 ? 'pending' : cloudflare.length > 0 ? 'verified' : ('failed' as const)
