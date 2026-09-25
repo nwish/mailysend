@@ -166,7 +166,9 @@ export class HttpClient {
           'it is the origin you deployed MailySend to, e.g. https://mail.example.com.',
       )
     }
-    this.baseUrl = baseUrl.replace(/\/+$/, '')
+    let baseUrlEnd = baseUrl.length
+    while (baseUrlEnd > 0 && baseUrl.charCodeAt(baseUrlEnd - 1) === 47) baseUrlEnd--
+    this.baseUrl = baseUrl.slice(0, baseUrlEnd)
     this.#maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     this.#baseBackoffMs = options.baseBackoffMs ?? BASE_BACKOFF_MS

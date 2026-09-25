@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { VERSION } from '../src/http.ts'
+import { MailySend } from '../src/index.ts'
 import { API_KEY, BASE_URL, bodyOf, harness, json } from './helpers.ts'
 
 describe('transport', () => {
@@ -23,11 +24,9 @@ describe('transport', () => {
     expect(h.call().url.search).toBe('?limit=10&status=delivered')
   })
 
-  it('trims a trailing slash off the base url', async () => {
-    const h = harness([json({ object: 'list', data: [], has_more: false })])
-    // Reaching through the client rather than constructing a second one keeps
-    // the assertion about the URL that actually goes out.
-    expect(h.client.http.baseUrl).toBe(BASE_URL)
+  it('trims repeated trailing slashes off the base url', () => {
+    const client = new MailySend(API_KEY, { baseUrl: `${BASE_URL}${'/'.repeat(64)}` })
+    expect(client.http.baseUrl).toBe(BASE_URL)
   })
 
   it('encodes path segments that can contain reserved characters', async () => {

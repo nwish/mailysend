@@ -28,7 +28,13 @@ export interface ClassifyInput {
   cfAsn?: number | null
 }
 
-const MPP_UA = /GoogleImageProxy|Apple-?Mail|iPhone Mail|MacOutlook.*Preview/i
+const MPP_UA = /GoogleImageProxy|Apple-?Mail|iPhone Mail/i
+const MAC_OUTLOOK_UA = /MacOutlook/i
+const PREVIEW_UA = /Preview/i
+const isMacOutlookPreview = (ua: string): boolean => {
+  const macOutlook = MAC_OUTLOOK_UA.exec(ua)
+  return macOutlook !== null && PREVIEW_UA.test(ua.slice(macOutlook.index + macOutlook[0].length))
+}
 const APPLE_PRIVATE_RELAY_UA =
   /Mozilla\/5\.0 \(Macintosh; Intel Mac OS X 10_15_7\) AppleWebKit\/605\.1\.15 \(KHTML, like Gecko\)$/
 
@@ -69,7 +75,7 @@ export function classifyHit(input: ClassifyInput): { class: AudienceClass; reaso
     return { class: 'human', reason: 'Gmail image proxy, delayed — likely a real open' }
   }
 
-  if (MPP_UA.test(ua) || APPLE_PRIVATE_RELAY_UA.test(ua)) {
+  if (MPP_UA.test(ua) || isMacOutlookPreview(ua) || APPLE_PRIVATE_RELAY_UA.test(ua)) {
     return { class: 'mpp', reason: 'Apple Mail Privacy Protection' }
   }
   if (input.cfAsn && APPLE_ASNS.has(input.cfAsn)) {
