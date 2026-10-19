@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@mailysend/contracts": "workspace:*",
-    "handlebars": "^4.7.9",
+    "handlebars": "^4.7.10",
     "zod": "^4.5.4"
   },
   "peerDependencies": {
